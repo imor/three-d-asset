@@ -175,6 +175,7 @@ pub struct Camera {
     projection: Mat4,
     screen2ray: Mat4,
     frustrum: [Vec4; 6],
+    zoom_state: ZoomState,
 }
 
 impl Camera {
@@ -543,6 +544,7 @@ impl Camera {
             view: Mat4::identity(),
             projection: Mat4::identity(),
             screen2ray: Mat4::identity(),
+            zoom_state: Default::default(),
         }
     }
 
@@ -687,6 +689,131 @@ impl Camera {
             self.set_orthographic_projection(new_height, self.z_near, self.z_far);
         } else {
             panic!("zoom_towards should only be used with an orthographic camera");
+        }
+    }
+
+    /// Returns true if it is possible to zoom in the zoom direction passed as the argument
+    fn can_zoom(&mut self, zoom: Zoom) -> bool {
+        self.zoom_state.update_count(zoom)
+    }
+
+    ///
+    /// Moves the camera towards the given point by the delta amount while keeping the given minimum and maximum viewport height.
+    ///
+    pub fn zoom_towards_2d(&mut self, zoom_point: &Vec3, zoom: Zoom) {
+        // Current position of the camera. Located on the positive z-axis.
+        let position = *self.position();
+        // Distance between the camera position and the point towards which the camera has to zoom.
+        let distance = zoom_point.distance(position);
+        // A unit vector pointing from the camera towards the zoom point
+        let direction = (zoom_point - position).normalize();
+        // Target is where the camera is looking at
+        let target = *self.target();
+
+        let zoom_factor = self.zoom_state.config.factor(zoom);
+
+        if !self.can_zoom(zoom) {
+            return;
+        }
+
+        if let ProjectionType::Orthographic { height } = self.projection_type() {
+            // New view height
+            let new_height = zoom_factor * height;
+            // The distance camera has to move from its current position towards the zoom_point
+            let new_distance = zoom_factor * distance;
+            // The new position of the camera after it has moved towards the zoom_point
+            let new_position = zoom_point - direction * new_distance;
+            // The new point where the camera is looking at after moving
+            let new_target = new_position + (target - position);
+            // Update view and projection
+            self.set_view(new_position, new_target, self.up);
+            self.set_orthographic_projection(new_height, self.z_near, self.z_far);
+        } else {
+            panic!("zoom_towards_2d should only be used with an orthographic camera");
+        }
+    }
+}
+
+/// The direction of the zoom.
+#[derive(Debug, Clone, Copy)]
+pub enum Zoom {
+    /// Zoom in operation
+    In,
+    /// Zoom out operation
+    Out,
+}
+
+impl From<f32> for Zoom {
+    fn from(value: f32) -> Self {
+        if value > 0.0 {
+            Zoom::In
+        } else {
+            Zoom::Out
+        }
+    }
+}
+
+/// Configuration for zooming.
+#[derive(Debug, Clone)]
+pub struct ZoomConfig {
+    /// The multiplicative factor by which each zoom operation scales the objects in the scene
+    factor: f32,
+    /// The maximum count of zoom out operations allowed
+    max_zoom_outs: i32,
+    /// The maximum count of zoom in operations allowed
+    max_zoom_ins: i32,
+}
+
+impl ZoomConfig {
+    /// Returns the zoom factor based on when it is a zoom in or zoom out operation
+    pub fn factor(&self, direction: Zoom) -> f32 {
+        match direction {
+            Zoom::In => 1. / self.factor,
+            Zoom::Out => self.factor,
+        }
+    }
+}
+
+/// The state of the zoom operations managed by the camera
+#[derive(Debug, Clone)]
+pub struct ZoomState {
+    /// The configuration of the zoom
+    config: ZoomConfig,
+    /// zoom
+    count: i32,
+}
+
+impl Default for ZoomState {
+    fn default() -> Self {
+        Self {
+            config: Default::default(),
+            count: 0,
+        }
+    }
+}
+
+impl ZoomState {
+    /// Updates zoom count and returns true if the count was updated, false otherwise
+    pub fn update_count(&mut self, direction: Zoom) -> bool {
+        let count = match direction {
+            Zoom::In => self.count + 1,
+            Zoom::Out => self.count - 1,
+        };
+        if count > self.config.max_zoom_ins || count < self.config.max_zoom_outs {
+            false
+        } else {
+            self.count = count;
+            true
+        }
+    }
+}
+
+impl Default for ZoomConfig {
+    fn default() -> Self {
+        Self {
+            factor: 1.5,
+            max_zoom_ins: 16,
+            max_zoom_outs: -16,
         }
     }
 }
