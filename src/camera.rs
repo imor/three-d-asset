@@ -193,7 +193,30 @@ impl Camera {
         z_near: f32,
         z_far: f32,
     ) -> Self {
-        let mut camera = Camera::new(viewport);
+        let mut camera = Camera::new(viewport, ZoomState::default());
+        camera.set_view(position, target, up);
+        camera.set_orthographic_projection(height, z_near, z_far);
+        camera
+    }
+
+    ///
+    /// New camera which projects the world with an orthographic projection.
+    /// See also [set_view](Self::set_view), [set_perspective_projection](Self::set_perspective_projection) and
+    /// [set_orthographic_projection](Self::set_orthographic_projection).
+    ///
+    pub fn new_orthographic_with_zoom_config(
+        viewport: Viewport,
+        position: Vec3,
+        target: Vec3,
+        up: Vec3,
+        height: f32,
+        z_near: f32,
+        z_far: f32,
+        zoom_config: ZoomConfig,
+    ) -> Self {
+        let mut zoom_state = ZoomState::default();
+        zoom_state.config = zoom_config;
+        let mut camera = Camera::new(viewport, zoom_state);
         camera.set_view(position, target, up);
         camera.set_orthographic_projection(height, z_near, z_far);
         camera
@@ -211,7 +234,7 @@ impl Camera {
         z_near: f32,
         z_far: f32,
     ) -> Self {
-        let mut camera = Camera::new(viewport);
+        let mut camera = Camera::new(viewport, ZoomState::default());
         camera.set_view(position, target, up);
         camera.set_perspective_projection(field_of_view_y, z_near, z_far);
         camera
@@ -531,7 +554,7 @@ impl Camera {
         self.view_direction().cross(self.up)
     }
 
-    fn new(viewport: Viewport) -> Camera {
+    fn new(viewport: Viewport, zoom_state: ZoomState) -> Camera {
         Camera {
             viewport,
             projection_type: ProjectionType::Orthographic { height: 1.0 },
@@ -544,7 +567,7 @@ impl Camera {
             view: Mat4::identity(),
             projection: Mat4::identity(),
             screen2ray: Mat4::identity(),
-            zoom_state: Default::default(),
+            zoom_state,
         }
     }
 
@@ -744,11 +767,11 @@ impl From<f32> for Zoom {
 #[derive(Debug, Clone)]
 pub struct ZoomConfig {
     /// The multiplicative factor by which each zoom operation scales the objects in the scene
-    factor: f32,
+    pub factor: f32,
     /// The maximum count of zoom out operations allowed
-    max_zoom_outs: i32,
+    pub max_zoom_outs: u32,
     /// The maximum count of zoom in operations allowed
-    max_zoom_ins: i32,
+    pub max_zoom_ins: u32,
 }
 
 impl ZoomConfig {
@@ -786,7 +809,7 @@ impl ZoomState {
             Zoom::In => self.count + 1,
             Zoom::Out => self.count - 1,
         };
-        if count > self.config.max_zoom_ins || count < self.config.max_zoom_outs {
+        if count > self.config.max_zoom_ins as i32 || count < -(self.config.max_zoom_outs as i32) {
             false
         } else {
             self.count = count;
@@ -800,7 +823,7 @@ impl Default for ZoomConfig {
         Self {
             factor: 1.5,
             max_zoom_ins: 16,
-            max_zoom_outs: -16,
+            max_zoom_outs: 16,
         }
     }
 }
