@@ -104,9 +104,9 @@ pub struct Viewport {
 
 impl Viewport {
     ///
-    /// Creates a new viewport with the bottom left corner at origo `(0, 0)`.
+    /// Creates a new viewport with the bottom left corner at origin `(0, 0)`.
     ///
-    pub fn new_at_origo(width: u32, height: u32) -> Self {
+    pub fn new_at_origin(width: u32, height: u32) -> Self {
         Self {
             x: 0,
             y: 0,
