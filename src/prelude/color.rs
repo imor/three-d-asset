@@ -108,3 +108,40 @@ impl Default for Color {
         Color::WHITE
     }
 }
+
+///
+/// Represents an error while converting the color
+///
+#[derive(Debug)]
+pub enum ColorConversionError {
+    /// Overflow occurren while converting to color
+    Overflow,
+}
+
+impl TryFrom<usize> for Color {
+    type Error = ColorConversionError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        if value >= 0xFF_FF_FF_FF {
+            return Err(ColorConversionError::Overflow);
+        }
+
+        let r = ((value & 0xFF_00_00_00) >> 24) as u8;
+        let g = ((value & 0x00_FF_00_00) >> 16) as u8;
+        let b = ((value & 0x00_00_FF_00) >> 8) as u8;
+        let a = ((value & 0x00_00_00_FF) >> 0) as u8;
+
+        Ok(Color::new(r, g, b, a))
+    }
+}
+
+impl From<Color> for usize {
+    fn from(value: Color) -> Self {
+        let mut i = 0usize;
+        i |= (value.r as usize) << 24;
+        i |= (value.g as usize) << 16;
+        i |= (value.b as usize) << 8;
+        i |= (value.a as usize) << 0;
+        i
+    }
+}
