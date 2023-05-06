@@ -112,7 +112,7 @@ impl Default for Color {
 ///
 /// Represents an error while converting the color
 ///
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ColorConversionError {
     /// Overflow occurren while converting to color
     Overflow,
@@ -143,5 +143,44 @@ impl From<Color> for usize {
         i |= (value.b as usize) << 8;
         i |= (value.a as usize) << 0;
         i
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{Color, ColorConversionError};
+
+    #[test]
+    fn color_roundtrip() {
+        fn test_ok(input: Color, expected_output: Color) {
+            let i: usize = input.into();
+            let output: Result<Color, ColorConversionError> = i.try_into();
+            assert_eq!(output, Ok(expected_output));
+        }
+        fn test_err(input: Color) {
+            let i: usize = input.into();
+            let output: Result<Color, ColorConversionError> = i.try_into();
+            assert_eq!(output, Err(ColorConversionError::Overflow));
+        }
+        test_ok(Color::new(0, 0, 0, 0), Color::new(0, 0, 0, 0));
+        test_ok(Color::new(255, 0, 0, 0), Color::new(255, 0, 0, 0));
+        test_ok(Color::new(0, 255, 0, 0), Color::new(0, 255, 0, 0));
+        test_ok(Color::new(0, 0, 255, 0), Color::new(0, 0, 255, 0));
+        test_ok(Color::new(0, 0, 0, 255), Color::new(0, 0, 0, 255));
+        test_ok(Color::new(255, 255, 0, 0), Color::new(255, 255, 0, 0));
+        test_ok(Color::new(255, 255, 255, 0), Color::new(255, 255, 255, 0));
+        test_err(Color::new(255, 255, 255, 255));
+    }
+
+    #[test]
+    fn usize_roundtrip() {
+        fn test_ok(input: usize, expected_output: usize) {
+            let color: Color = input.try_into().expect("Failed to convert into color");
+            let output: usize = color.into();
+            assert_eq!(output, expected_output);
+        }
+        for i in 0..=u16::MAX {
+            test_ok(i as usize, i as usize);
+        }
     }
 }
